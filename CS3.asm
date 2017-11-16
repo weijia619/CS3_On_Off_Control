@@ -140,7 +140,7 @@ ModeSelection
 ;-----------------------------------------------------------
 
 comf    PORTE,0     ; compliment PORTE into w register
-movfw   PORTB       ; send the right mode num to LED indicator
+movwf   PORTB       ; send the right mode num to LED indicator
 bcf     PORTB,3     ; no error indicated on pin 3 LED indicator
 
 movwf   State       ; move the mode state to State register
