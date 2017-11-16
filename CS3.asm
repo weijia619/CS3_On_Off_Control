@@ -171,10 +171,9 @@ goto    ModeFour    ; goto Mode Four
 
 ;#######################################################
 
-
 ; Fault Processing
+; If it is mode 1,2,3,4, Welcome to FaultProcessing !
 
-;-----------------------------------------------
 FaultInfo
 
 ;movwf   PORTE,0     ; read PORTE value to w register
@@ -288,8 +287,6 @@ movwf   ADCON0      ; move to special function A/D register
 call    ADDelay     ; delay for Tad prior to A/D start
 bsf     ADCON0,GO   ; start A/D conversion
 call    ADwaitLoop  ; since we might use this in the next modes, here define it as a subroutine
-btfsc   ADCON0,GO   ; make sure A/D finished
-goto    ADwaitLoop  ; else keep looping
 
 btfsc   PORTC,1     ; see if red button pressed
 goto    RedPress2   ; go to red press mode 2
@@ -332,6 +329,7 @@ EngTimer
 
 movf    ADRESH,W    ; get A/D value
 movwf   ADValue     ; send it to ADValue
+movwf   Count       ; same function with ADValue, but case study asks to do so
 bsf		PORTD,4
 ;FOR TEST!!! 
 ;movlw	B'00001111'
@@ -411,16 +409,64 @@ btfss   PORTD,1     ; check if it is disengaged
 return             ; if it is , return
 goto    SoleToDis2   ; if not , keep looping
 
+
+;****************************************************
+;                                                   #
+;     NEED TO DEAL WITH THE FAULT IN MODE 2 !!!     # 
+;                                                   #    
+;####################################################
+
 ;####################################################
 
 ModeThree
+
+btfsc   PORTC,0     ;see if green button pressed
+goto    GreenPress  ; if pressed , go to GreenPress
+
+movlw   B'01000001' ; select 8 * oscillator , analog input 0 , turn on
+movwf   ADCON0      ; move to special function A/D register
+
+call    ADDelay     ; delay for Tad prior to A/D start
+bsf     ADCON0,GO   ; start A/D conversion
+call    ADwaitLoop  ; since we might use this in the next modes, here define it as a subroutine
+btfsc   ADCON0,GO   ; make sure A/D finished
+goto    ADwaitLoop  ; else keep looping
+
+bcf     PORTD,4     ; init of PORTD, pin 4
+bcf     PORTD,5     ; init of PORTD, pin 5
+
+btfsc   PORTC,1     ; see if red button pressed
+goto    RedPress3   ; go to red press mode 2
+goto    ModeThree
+
+
+RedPress3
+
+btfsc   PORTC,1     ; see if red button released
+goto    ModeThree   ; noise -- keep checking
+
+
+RedRelease3
+
+btfsc   PORTC,1     ; see if red button released
+goto    RedRelease3 ; no ,keep checking 
+call    SwitchDelay ; let switch debounce
+btg     PORTD,4     ; invert PORTD,pin 4
+btfsc   PORTD,4     ; if PORTD , pin 4 is 1, make control active
+goto    CtrlAct     ; goto Control Active part
+goto    CtrlDeact   ; else goto control deactive part
+
+
+CtrlAct
+
+
 
 
 ;####################################################
 
 ModeFour
 
-
+bsf     PORTD,7     ; null
 
 ;####################################################
 
