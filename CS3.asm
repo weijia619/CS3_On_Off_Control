@@ -17,7 +17,6 @@ __CONFIG _CONFIG2, _BORSEN_0 & _IESO_OFF &_FCMEN_OFF
 
 
 
-
 ;############################
 ;   Variable Declaration   ##
 ;############################
@@ -41,13 +40,13 @@ Timer0  equ 27h
 
 ;Initial Part
 
-org 00h
-goto    initPort
+    org 00h
+    goto    initPort
 
-org 04h
-goto    isrService
+    org 04h
+    goto    isrService
 
-org 10h
+    org 10h
 
 ;##############################
 ;   PORT INITIALIZATION    ####
@@ -55,25 +54,25 @@ org 10h
 
 initPort
 
-clrf    PORTB ; clear PORT B,C,D,E
-clrf    PORTC
-clrf    PORTD
-clrf    PORTE
+    clrf    PORTB ; clear PORT B,C,D,E
+    clrf    PORTC
+    clrf    PORTD
+    clrf    PORTE
 
-bsf     STATUS,RP0  ; set bit in STATUS register for bank 1
-clrf    TRISB       ; configure Port B as all outputs
-movlw   B'00000011' ; move 0xFF into W register
-movwf   TRISC       ; configure Port C pin0,1 as inputs
-movlw   B'00000111' ; move 0x07 into W register
-movwf   TRISE       ; configure Port E pin 0,1,2 as inputs (octal switch)
-movlw   B'00001010' ; IN ORDER TO MAKE PORTE WORK, LOWER 4 BITS SHOULD BE 1010, [LECTURE 4]
-movwf   ADCON1      ; move to special function A/D register
-movlw   B'00000010' ; move 0x02 into W register
-movwf   TRISD       ; Port D pin 1 input, others output
-bcf     STATUS,RP0  ; select register bank 0
-clrf    Count       ; zero the counter
-clrf    State
-clrf	ADValue
+    bsf     STATUS,RP0  ; set bit in STATUS register for bank 1
+    clrf    TRISB       ; configure Port B as all outputs
+    movlw   B'00000011' ; move 0xFF into W register
+    movwf   TRISC       ; configure Port C pin0,1 as inputs
+    movlw   B'00000111' ; move 0x07 into W register
+    movwf   TRISE       ; configure Port E pin 0,1,2 as inputs (octal switch)
+    movlw   B'00001010' ; IN ORDER TO MAKE PORTE WORK, LOWER 4 BITS SHOULD BE 1010, [LECTURE 4]
+    movwf   ADCON1      ; move to special function A/D register
+    movlw   B'00000010' ; move 0x02 into W register
+    movwf   TRISD       ; Port D pin 1 input, others output
+    bcf     STATUS,RP0  ; select register bank 0
+    clrf    Count       ; zero the counter
+    clrf    State
+    clrf	ADValue
 
 ;#######################################################
 ;#######################################################
