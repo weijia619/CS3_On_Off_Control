@@ -433,10 +433,9 @@ btfsc   ADCON0,GO   ; make sure A/D finished
 goto    ADwaitLoop  ; else keep looping
 
 bcf     PORTD,4     ; init of PORTD, pin 4
-bcf     PORTD,5     ; init of PORTD, pin 5
 
 btfsc   PORTC,1     ; see if red button pressed
-goto    RedPress3   ; go to red press mode 2
+goto    RedPress3   ; go to red press mode 3
 goto    ModeThree
 
 
