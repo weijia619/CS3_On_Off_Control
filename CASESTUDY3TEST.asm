@@ -47,7 +47,7 @@ init
 	movwf	TRISB	;set Port B pin 0-3 as all outputs for LEDs
 					;set unused pins as inputs
 	
-	movlw	B'11111100';
+	movlw	B'01111100';
 	movwf	TRISD	;Port D pin0:main TIP(output)
 					;Port D pin1:reduced TIP(output)
 					;Port D pin2:an input pin used for sensor
@@ -57,7 +57,9 @@ init
 	movwf	TRISC	;Configure Port C as all inputs
 					;Port C pin 0:green button
 					;Port C pin 1:red button
-	movlw	B'1111'				
+	movlw   B'00001010'
+	movwf   ADCON1
+	movlw	B'00000111'				
 	movwf	TRISE	;Configure Port E pin 0,1,2 as inputs from octal switch
 					;set unused pins as outputs
 	
@@ -84,27 +86,31 @@ GreenRelease
 
 Classify
 
-	comf PORTE,w	;compliment PORTE and store the result in w
+	comf PORTE,w	;complement PORTE and store the result in w
 	andlw B'00000111'	;only need last three numbers to indicate mode
 	movwf State	;The value of State is the mode we choose
 	
 	bcf STATUS,Z
-	xorwf 01h  ;xor w with 1
+	movlw 01h 
+	xorwf State,0  ;xor w with 1
 	btfsc STATUS,Z	;if w=1
 	goto initPortMode1	;execute mode1
 	
 	bcf STATUS,Z
-	xorwf,02h 	;xor w with 2
+	movlw 02h 
+	xorwf State,0  ;xor w with 2
 	btfsc STATUS,Z	;if w=2
 	goto initPortMode2	;execute mode2
 	
 	bcf STATUS,Z
-	xorwf,03h 	;xor w with 3
+	movlw 03h 
+	xorwf State,0  ;xor w with 3
 	btfsc STATUS,Z	;if w=3
 	goto initPortMode3	;execute mode3
 	
 	bcf STATUS,Z
-	xorwf,04h 	;xor w with 4
+	movlw 04h 
+	xorwf State,0  ;xor w with 4
 	btfsc STATUS,Z	;if w=4
 	goto initPortMode4	;execute mode4
 
@@ -205,10 +211,6 @@ RedRelease2
 
 initAD2
 
-	bsf STATUS,RP0
-	movlw B'00000100'
-	movwf ADCON1
-	bcf STATUS,RP0
 	movlw B'01000001'
 	movwf ADCON0
 	call SetupDelay
@@ -228,9 +230,9 @@ waitloop2
 	
 ADvalueZero2
 
-	movwf 0h	;w=0
+	movlw 0h	    ;w=0
 	bcf STATUS,Z	;clear Z before xor
-	xorlw ADvalue 	;xor ADvalue with w(0)
+	xorwf ADvalue,0 ;xor ADvalue with w(0)
 	btfsc STATUS,Z	;if z=1,i.e.ADvalue = 0
 	goto initError	;ADvalue can't be 0
 	
@@ -254,7 +256,7 @@ oneforthvalue2
 	movlw 0h
 	bcf STATUS,Z
 	decf ADvalue,F	;ADvalue=ADvalue-1,until ADvalue=0
-	xor ADvalue,W
+	xorwf ADvalue,W
 	
 	btfsc STATUS,Z
 	call SolenoidDis
@@ -276,7 +278,7 @@ RedAgain
 	goto RedRelease2
 
 
-；*************mode3*************
+;；*************mode3*************
 initPortMode3
 	
 	movlw 03h
@@ -309,18 +311,15 @@ RedPress3
 	btfss PORTC,1	;See if red button still Pressed
 	goto waitPress3
 	
-RedRelease3
+RedRelease31
 	btfsc PORTC,1	;See if red button is released
-	goto RedRelease3
+	goto RedRelease31
 
 	call SwitchDelay	;let switch debounce
 	
 initAD3
 
-	bsf STATUS,RP0
-	movlw B'00001010'
-	movwf ADCON1
-	bcf STATUS,RP0
+
 	movlw B'01000001'
 	movwf ADCON0
 	call SetupDelay
@@ -330,15 +329,18 @@ Active
 	goto ActiveBegin
 	bcf PORTD,7;the 7th LED of PORTD is a indicator, turn it off when making the system inactive
 	call SolenoidDis
+
+RedRelease32
+	btfsc PORTC,1	;See if red button is released
+	goto RedRelease32
+
 	goto waitPress3	;make control inactive and wait for the button pressed
 	
 ActiveBegin
+	bsf PORTD,7;the 7th LED of PORTD is a indicator
 	bsf ADCON0,GO
 		
 waitloop3
-	btfsc ADCON0,GO	;check if A/D is finished
-	goto waitloop3
-	
 ;After A/D finished, get AD value 
 	btfsc ADCON0,GO	;make sure A/D finished
 	goto waitloop3	;if not,continiue to wait
@@ -355,7 +357,8 @@ ADvalueZero3
 	goto initError	;ADvalue can't be 0
 	
 Compare70h	
-	subwf ADvalue,70h
+	movlw	70h
+	subwf ADvalue,0
 	btfsc STATUS,C	;if C is 1,i.e.the result is positive or zero, AD≥70h,then the solenoid engages
 	call SolenoidEngaged
 	btfss STATUS,C	;if the result is negative,then the soleniod disengaged
@@ -373,10 +376,6 @@ initPortMode4
 
 initAD4
 
-	bsf STATUS,RP0
-	movlw B'00000100'
-	movwf ADCON1
-	bcf STATUS,RP0
 	movlw B'01000001'
 	movwf ADCON0
 	call SetupDelay
@@ -384,9 +383,6 @@ initAD4
 	bsf ADCON0,GO
 		
 waitloop4
-	btfsc ADCON0,GO	;check if A/D is finished
-	goto waitloop4
-	
 ;After A/D finished, get AD value 
 	btfsc ADCON0,GO	;make sure A/D finished
 	goto waitloop4	;if not,continiue to wait
@@ -398,7 +394,7 @@ ADvalueZero4
 
 	movlw 0h	;w=0
 	bcf STATUS,Z
-	xorlw ADvalue,0 	;xor ADvalue with w(0)
+	xorwf ADvalue,0 	;xor ADvalue with w(0)
 	btfsc STATUS,Z	;if z=1,i.e.ADvalue = 0
 	goto initError	;ADvalue can't be 0
 
@@ -484,9 +480,9 @@ initoneforthsecond4
 ;One forth of 333,333 is 83333,which is 14585 in hex.	
 	movlw 02h
 	movwf Timer2	;get the most significant value+1
-	movlw 45
+	movlw 0x45
 	movwf Timer1
-	movlw 85
+	movlw 0x85
 	movwf Timer0
 	
 oneforthvalue4
@@ -495,7 +491,7 @@ oneforthvalue4
 	movlw 0h
 	bcf STATUS,Z
 	decf ADvalue,F	;ADvalue=ADvalue-1,until ADvalue=0
-	xor ADvalue,W
+	xorwf ADvalue,W
 	
 ;if ADvalue is 0,then disengage the solenoid and go back to waitPress4
 	btfsc STATUS,Z
@@ -519,7 +515,7 @@ initTenSeconds42
 	
 	call Timedelay	;delay for ten seconds
 	
-	bcfsc PORTD,2 ;if the solenoid is still engaged
+	btfsc PORTD,2 ;if the solenoid is still engaged
 	goto initError
 
 	goto initPortMode4
