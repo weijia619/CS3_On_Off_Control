@@ -1,5 +1,5 @@
 
-；*************pins*************
+;；*************pins*************
 ;PORT A pin 0:control pot(input)
 ;PORT B pin 0-3:LED(output)
 ;PORT C pin 0:green  button(input)
@@ -11,7 +11,7 @@
 
 
 	#include <P16F747.INC>
-	Title Case study three�
+	Title "Case study three�"
 
 	__CONFIG	_CONFIG1,	_FOSC_HS & _CP_OFF & _DEBUG_OFF & _VBOR_2_0 & _BOREN_0 & _MCLR_ON & _PWRTE_ON & _WDT_OFF
 	__CONFIG	_CONFIG2,	_BORSEN_0 & _IESO_OFF & _FCMEN_OFF
@@ -26,15 +26,15 @@ Timer1	equ 25h
 Timer0	equ 26h
 Mode	equ 27h
 
-org 00h
-goto init
+	org 00h
+	goto init
 
-org 04h
-goto isrService
+	org 04h
+	goto isrService
 
-org 15h
+	org 15h
 
-；*************init*************
+;；*************init*************
 init
 
 	clrf	PORTB
@@ -110,7 +110,7 @@ Classify
 
 	goto initError	;if the mode isn't 1,2,3 or 4,that'll be an error.
 	
-；*************mode1*************
+;；*************mode1*************
 initPortMode1
 	;bsf Mode,1	;make the pin1 of Mode to be 1(others are 0)
 	clrf PORTB
@@ -163,7 +163,7 @@ outCount
 	
 	goto waitPress1
 		
-；*************mode2*************
+;；*************mode2*************
 initPortMode2
 	bsf Mode,2	;make the pin2 of Mode to be 1(others are 0)
 	movlw 02h
@@ -348,7 +348,7 @@ waitloop3
 	
 ADvalueZero3
 
-	movwf 0h	;w=0
+	movlw 0h	;w=0
 	bcf STATUS,Z
 	xorwf ADvalue,0 	;xor ADvalue with w(0) and store the value in w
 	btfsc STATUS,Z	;if z=1,i.e.ADvalue = 0
@@ -364,7 +364,7 @@ Compare70h
 	goto Active	;convert the AD value again and compare it to 70h and do something with solenoid
 
 
-；*************mode4*************
+;；*************mode4*************
 initPortMode4
 	bsf Mode,4	;make the pin4 of Mode to be 1(others are 0)
 	movlw 04h
@@ -396,9 +396,9 @@ waitloop4
 	
 ADvalueZero4
 
-	movwf 0h	;w=0
+	movlw 0h	;w=0
 	bcf STATUS,Z
-	xorlw ADvalue 	;xor ADvalue with w(0)
+	xorlw ADvalue,0 	;xor ADvalue with w(0)
 	btfsc STATUS,Z	;if z=1,i.e.ADvalue = 0
 	goto initError	;ADvalue can't be 0
 
@@ -473,7 +473,7 @@ ReducedTIPon
 	btfss PORTD,2	;if the solenoid hasn't been engaged
 	incf Count ;every time sensor indicates that solenoid hasn't been engaged,Count++
 	
-	bcfsc Count,2	;if Count is B'10',it's the second time.
+	btfsc Count,2	;if Count is B'10',it's the second time.
 	goto initError
 	
 	btfss PORTD,2	;if the solenoid hasn't been engaged
@@ -524,7 +524,7 @@ initTenSeconds42
 
 	goto initPortMode4
 
-；*************kinds of Delay*************	
+;；*************kinds of Delay*************	
 
 Timedelay
 ;loop until the time that Timer varibales indicates
@@ -551,7 +551,7 @@ delay
 	goto delay
 	return
 	
-；*************Solenoid*************
+;；*************Solenoid*************
 SolenoidEngaged	
 ;let the solenoid engages
 	bsf PORTD,0	;turn on the main TIP
@@ -574,7 +574,7 @@ SolenoidDis
 	
 	return
 	
-；*************Error*************
+;；*************Error*************
 
 initError
 	movf State,w	;w=State
