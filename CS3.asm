@@ -37,7 +37,7 @@ ADValue equ 24h ; value read from AD
 Timer2  equ 25h
 Timer1  equ 26h
 Timer0  equ 27h
-Octal	equ	30h
+
 ;Initial Part
 
     org 00h
@@ -73,7 +73,7 @@ initPort
     clrf    Count       ; zero the counter
     clrf    State
     clrf	ADValue
-	clrf	Octal
+
 ;#######################################################
 ;#######################################################
 
@@ -104,39 +104,10 @@ GreenRelease
 	goto    GreenRelease; if not, keep waiting
 
 	call    SwitchDelay ; let switch debounce
-	;clrf    PORTD       ; turn off the solenoid
-	goto    ModeSelection
+	;goto    ModeSelection
 
 
 ModeSelection
-
-;this part is f**king silly, but I just wanna make it right
-
-;-----------------------------------------------------------
-; movfw   PORTE       ; read value from octal switch
-; bcf     STATUS,Z    ; clear zero flag in STATUS register
-; xorlw   B'00000111' ; compare with 0x07 to see if is Mode 0
-; btfsc   STATUS,Z    ; if it is Mode 0 ( Z will be 1)
-; goto    FaultInfo   ; go to Fault processing subroutine
-
-; movfw   PORTE       ; read value from octal switch
-; bcf     STATUS,Z    ; clear zero flag in STATUS register
-; xorlw   B'00000010' ; compare with 0x02 to see if is Mode 5
-; btfsc   STATUS,Z    ; if it is Mode 5 ( Z will be 1)
-; goto    FaultInfo   ; go to Fault processing subroutine
-
-; movfw   PORTE       ; read value from octal switch
-; bcf     STATUS,Z    ; clear zero flag in STATUS register
-; xorlw   B'00000001' ; compare with 0x01 to see if is Mode 6
-; btfsc   STATUS,Z    ; if it is Mode 6 ( Z will be 1)
-; goto    FaultInfo   ; go to Fault processing subroutine
-
-; movfw   PORTE       ; read value from octal switch
-; bcf     STATUS,Z    ; clear zero flag in STATUS register
-; xorlw   B'00000000' ; compare with 0x00 to see if is Mode 7
-; btfsc   STATUS,Z    ; if it is Mode 7 ( Z will be 1)
-; goto    FaultInfo   ; go to Fault processing subroutine
-;-----------------------------------------------------------
 
 	comf    PORTE,0     ; complement PORTE into w register
 	andlw	B'00000111' ; only leave the lower 3 bits of PORTE
@@ -239,8 +210,9 @@ RedRelease
 	goto    RedRelease  ; no , keep checking
 	call    SwitchDelay ; let switch debounce
 	btfss   PORTD,1     ; see if solenoid is engaged or disengaged , by Pin 1 in PORTD
-	goto    SoleToEng   ; if it is disengaged, make it engage
-	goto    SoleToDis   ; if it is engaged, make it disengage
+	call    SoleToEng   ; if it is disengaged, make it engage
+	btfsc	PORTD,1		; see if solenoid is engaged or disengaged , by Pin 1 in PORTD
+	call    SoleToDis   ; if it is engaged, make it disengage
 
 	goto    ModeOne    ; when everything is done, return to ModeOne, keep looping
 
@@ -248,28 +220,23 @@ RedRelease
 
 SoleToEng
 ; make solenoid engage
-	movlw	B'0001'
-	movwf	PORTB
 	bsf     PORTD,0     ; make it engage
 	btfsc   PORTD,1     ; check if it is engaged , this pin is connected to LM311 as an input
-	goto    TrnReduced              ; if it is, return 
-	goto SoleToEng      ; if not, keep looping
+	goto    TrnReduced  ; if it is, turn on and off the corresponding transistors 
+	goto 	SoleToEng   ; if not, keep looping
 
 TrnReduced
 
 	bsf     PORTD,2     ; turn on the reduced transistor
 	bcf     PORTD,0     ; turn off the main transistor
-	bsf		PORTB,1
-	goto    ModeOne
+	return
 
 SoleToDis
 ; make solenoid disengage
-	movlw	B'1000'
-	movwf	PORTB
 	bcf     PORTD,0     ; make it disengage
 	bcf     PORTD,2     ; turn off the reduced transistor
 	btfss   PORTD,1     ; check if it is disengaged
-	goto    ModeOne              ; if it is , return
+	return		        ; if it is , return
 	goto    SoleToDis   ; if not , keep looping
 ;--------------------------------------------------------
 
@@ -277,145 +244,99 @@ SoleToDis
 
 ModeTwo
 
-btfsc   PORTC,0     ;see if green button pressed
-goto    GreenPress  ; if pressed , go to GreenPress
+	btfsc   PORTC,0     ;see if green button pressed
+	goto    GreenPress  ; if pressed , go to GreenPress
 
 ; below two expressions are initialization of A/D Hardware
 
-movlw   B'01000001' ; select 8 * oscillator , analog input 0 , turn on
-movwf   ADCON0      ; move to special function A/D register
+	movlw   B'01000001' ; select 8 * oscillator , analog input 0 , turn on
+	movwf   ADCON0      ; move to special function A/D register
 
-call    ADDelay     ; delay for Tad prior to A/D start
-bsf     ADCON0,GO   ; start A/D conversion
-call    ADwaitLoop  ; since we might use this in the next modes, here define it as a subroutine
+	call    ADDelay     ; delay for Tad prior to A/D start
+	bsf     ADCON0,GO   ; start A/D conversion
+	call    ADwaitLoop  ; since we might use this in the next modes, here define it as a subroutine
 
-btfsc   PORTC,1     ; see if red button pressed
-goto    RedPress2   ; go to red press mode 2
-goto    ModeTwo
+	btfsc   PORTC,1     ; see if red button pressed
+	goto    RedPress2   ; go to red press mode 2
+	goto    ModeTwo
 
 
 ADwaitLoop
 
-btfsc   ADCON0,GO   ; check if A/D is finished
-goto    ADwaitLoop  
-return
+	btfsc   ADCON0,GO   ; check if A/D is finished
+	goto    ADwaitLoop  
+	return
 
 RedPress2
 
-btfss   PORTC,1     ; see if red button released
-goto    ModeTwo     ; no , noise, keep checking
+	btfss   PORTC,1     ; see if red button released
+	goto    ModeTwo     ; no , noise, keep checking
 
 RedRelease2
 
-btfsc   PORTC,1     ; see if red button released
-goto    RedRelease2 ; no , keep waiting
+	btfsc   PORTC,1     ; see if red button released
+	goto    RedRelease2 ; no , keep waiting
 
-call    SwitchDelay
+	call    SwitchDelay
 
-bcf     STATUS,Z    ; clear zero flag in STATUS register, we wanna check if reading of ADC is 0
-movf    ADRESH,W    ; get A/D value, send it to w register
-iorlw   B'00000000' ; inclusive OR with W, to see if AD value is 0
+	bcf     STATUS,Z    ; clear zero flag in STATUS register, we wanna check if reading of ADC is 0
+	movf    ADRESH,W    ; get A/D value, send it to w register
+	iorlw   B'00000000' ; inclusive OR with W, to see if AD value is 0
 ; check if xorlw also works 1!!!!
-btfsc   STATUS,Z    ; if it is zero ( Z will be 1)
-;goto    FaultInfo   ; a fault is indicated
+	btfsc   STATUS,Z    ; if it is zero ( Z will be 1)
+	goto    FaultInfo   ; a fault is indicated
 
-btfss   PORTD,0     ; check the solenoid
-call    SoleToEng2   ; if disengage, make it engage
-call    EngTimer    ; timer for engagement of solenoid
-bsf		PORTD,7
-call    SoleToDis2   ; after the given time, disengage the solenoid
-goto    ModeTwo     ; keep looping
+	btfss   PORTD,1     ; check the solenoid
+	call    SoleToEng   ; if disengage, make it engage
+	call    EngTimer    ; timer for engagement of solenoid
+	call    SoleToDis   ; after the given time, disengage the solenoid
+	goto    ModeTwo     ; keep looping
 
-EngTimer
+EngTimer			;Engage Timer
 
-movf    ADRESH,W    ; get A/D value
-movwf   ADValue     ; send it to ADValue
-movwf   Count       ; same function with ADValue, but case study asks to do so
-bsf		PORTD,4
-;FOR TEST!!! 
-;movlw	B'00001111'
-;movwf	ADValue
-;rrf		ADValue,F
-;rrf		ADValue,F
-;PLEASE DELETE ABOVE SENTENCE AFTERWARDS
+	movf    ADRESH,W    ; get A/D value
+	movwf   ADValue     ; send it to ADValue
+	movwf   Count       ; same function with ADValue, but case study asks to do so
+
+
 QuarterDelay
 ; 1/4s need approximately 83333 loops , it is 14585h in hex
 
-movlw   02h         ; get most significant hex value +1
-movwf   Timer2      ; 
-movlw   16h         ;
-movwf   Timer1
-movlw   15h
-movwf   Timer0
+	movlw   02h         ; get most significant hex value +1
+	movwf   Timer2      ; 
+	movlw   16h         ;
+	movwf   Timer1
+	movlw   15h
+	movwf   Timer0
 
 QuarterDelayLoop
 
-btfsc   PORTC,1     ; check if press the red button again before time finishes
-goto    WTFRedAgain
-decfsz  Timer0,F
-goto    QuarterDelayLoop
-decfsz  Timer1,F
-goto    QuarterDelayLoop
-decfsz  Timer2,F
-goto    QuarterDelayLoop
-bsf		PORTD,5
+	btfsc   PORTC,1     ; check if press the red button again before time finishes
+	goto    WTFRedAgain
+	decfsz  Timer0,F
+	goto    QuarterDelayLoop
+	decfsz  Timer1,F
+	goto    QuarterDelayLoop
+	decfsz  Timer2,F
+	goto    QuarterDelayLoop
 
 ADLoopTimes
 
-decfsz  ADValue,F   ; decrement ADValue, end when Advalue = 0
-goto    QuarterDelay
-bsf		PORTD,6
-return
+	decfsz  ADValue,F   ; decrement ADValue, end when Advalue = 0
+	goto    QuarterDelay
+	return
 
 
 WTFRedAgain
 
-btfss   PORTC,1     ; see if red button still pressed
-goto    ModeTwo     ; no ,noise, restart
+	btfss   PORTC,1     ; see if red button still pressed
+	goto    ModeTwo     ; no ,noise, restart
 
 
 WTFRedRelease
 
-goto	RedRelease2
-;btfsc   PORTC,0     ; see if red button released
-;goto    RedRelease2 ; wait until released
-;call    SwitchDelay ; let switch debounce
-;goto    QuarterDelay; restart the timer
+	goto	RedRelease2
 
-
-
-SoleToEng2
-; make solenoid engage
-movlw	B'0001'
-movwf	PORTB
-bsf     PORTD,0     ; make it engage
-btfsc   PORTD,1     ; check if it is engaged , this pin is connected to LM311 as an input
-goto    TrnReduced2              ; if it is, return 
-goto SoleToEng2      ; if not, keep looping
-
-TrnReduced2
-
-bsf     PORTD,2     ; turn on the reduced transistor
-bcf     PORTD,0     ; turn off the main transistor
-bsf		PORTB,1
-return
-
-SoleToDis2
-; make solenoid disengage
-movlw	B'1000'
-movwf	PORTB
-bcf     PORTD,0     ; make it disengage
-bcf     PORTD,2     ; turn off the reduced transistor
-btfss   PORTD,1     ; check if it is disengaged
-return             ; if it is , return
-goto    SoleToDis2   ; if not , keep looping
-
-
-;****************************************************
-;                                                   #
-;     NEED TO DEAL WITH THE FAULT IN MODE 2 !!!     # 
-;                                                   #    
-;####################################################
 
 ;####################################################
 
@@ -451,10 +372,10 @@ RedRelease3
 btfsc   PORTC,1     ; see if red button released
 goto    RedRelease3 ; no ,keep checking 
 call    SwitchDelay ; let switch debounce
-btg     PORTD,4     ; invert PORTD,pin 4
+;btg     PORTD,4     ; invert PORTD,pin 4
 btfsc   PORTD,4     ; if PORTD , pin 4 is 1, make control active
 goto    CtrlAct     ; goto Control Active part
-goto    CtrlDeact   ; else goto control deactive part
+;goto    CtrlDeact   ; else goto control deactive part
 
 
 CtrlAct
@@ -467,6 +388,8 @@ CtrlAct
 ModeFour
 
 bsf     PORTD,7     ; null
+
+goto	ModeFour
 
 ;####################################################
 
