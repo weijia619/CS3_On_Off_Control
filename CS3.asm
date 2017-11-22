@@ -1,11 +1,11 @@
-LIST P = 16F747
-title "Case Study 3"
+	LIST P = 16F747
+	title "Case Study 3"
 
 #include <P16F747.INC>
 
-__CONFIG _CONFIG1, _FOSC_HS & _CP_OFF & _DEBUG_OFF & _VBOR_2_0 & _BOREN_0 & _MCLR_ON & _PWRTE_ON & _WDT_OFF
-
-__CONFIG _CONFIG2, _BORSEN_0 & _IESO_OFF &_FCMEN_OFF
+	__CONFIG _CONFIG1, _FOSC_HS & _CP_OFF & _DEBUG_OFF & _VBOR_2_0 & _BOREN_0 & _MCLR_ON & _PWRTE_ON & _WDT_OFF
+	
+	__CONFIG _CONFIG2, _BORSEN_0 & _IESO_OFF &_FCMEN_OFF
 
 
 ;#######################################
@@ -31,13 +31,13 @@ __CONFIG _CONFIG2, _BORSEN_0 & _IESO_OFF &_FCMEN_OFF
 
 Count   equ 20h ; Counter
 Temp    equ 21h ; A temporary register
-State   equ 22h ; Program state register
+State   equ 22h ; Program state register, stores value read from octal
 Delay   equ 23h ; delay for switch
 ADValue equ 24h ; value read from AD
 Timer2  equ 25h
 Timer1  equ 26h
 Timer0  equ 27h
-
+Octal	equ	30h
 ;Initial Part
 
     org 00h
@@ -73,7 +73,7 @@ initPort
     clrf    Count       ; zero the counter
     clrf    State
     clrf	ADValue
-
+	clrf	Octal
 ;#######################################################
 ;#######################################################
 
@@ -88,24 +88,24 @@ initPort
 
 waitPress
 
-btfsc   PORTC,0     ; see if green button pressed
-goto    GreenPress  ; if pressed -- go to routine
-goto    waitPress   ; if not , simply keep checking
+	btfsc   PORTC,0     ; see if green button pressed
+	goto    GreenPress  ; if pressed -- go to routine
+	goto    waitPress   ; if not , simply keep checking
 
 
 GreenPress
 
-btfss   PORTC,0     ; see if green button still pressed
-goto    waitPress   ; noise --button not pressed--keep checking
+	btfss   PORTC,0     ; see if green button still pressed
+	goto    waitPress   ; noise --button not pressed--keep checking
 
 GreenRelease
 
-btfsc   PORTC,0     ; see if green button is released
-goto    GreenRelease; if not, keep waiting
+	btfsc   PORTC,0     ; see if green button is released
+	goto    GreenRelease; if not, keep waiting
 
-call    SwitchDelay ; let switch debounce
-;clrf    PORTD       ; turn off the solenoid
-goto    ModeSelection
+	call    SwitchDelay ; let switch debounce
+	;clrf    PORTD       ; turn off the solenoid
+	goto    ModeSelection
 
 
 ModeSelection
@@ -138,76 +138,78 @@ ModeSelection
 ; goto    FaultInfo   ; go to Fault processing subroutine
 ;-----------------------------------------------------------
 
-comf    PORTE,0     ; compliment PORTE into w register
-movwf   PORTB       ; send the right mode num to LED indicator
-bcf     PORTB,3     ; no error indicated on pin 3 LED indicator
+	comf    PORTE,0     ; complement PORTE into w register
+	andlw	B'00000111' ; only leave the lower 3 bits of PORTE
+	movwf   State       ; move the mode state to State register
+	movwf   PORTB       ; send the right mode num to LED indicator
+	bcf     PORTB,3     ; no initial error indicated on pin 3 LED indicator
 
-movwf   State       ; move the mode state to State register
-bcf     STATUS,Z
-movlw   B'11111001' ; move 0xF1 (mode 1) to w register
-xorwf   State,0     ; compare with w to see if it is mode 1
-btfsc   STATUS,Z    ; if it is mode 1 (Z will be 1)
-goto    ModeOne     ; goto Mode One
 
-bcf     STATUS,Z
-movlw   B'11111010' ; move 0xF2 (mode 2) to w register
-xorwf   State,0     ; compare with w to see if it is mode 2
-btfsc   STATUS,Z    ; if it is mode 2 (Z will be 1)
-goto    ModeTwo     ; goto Mode Two
+	bcf     STATUS,Z
+	movlw   B'00000001' ; move 0x01 (mode 1) to w register
+	xorwf   State,0     ; compare with w to see if it is mode 1
+	btfsc   STATUS,Z    ; if it is mode 1 (Z will be 1)
+	goto    ModeOne     ; goto Mode One
 
-bcf     STATUS,Z
-movlw   B'11111011' ; move 0xF3 (mode 3) to w register
-xorwf   State,0     ; compare with w to see if it is mode 3
-btfsc   STATUS,Z    ; if it is mode 3 (Z will be 1)
-goto    ModeThree   ; goto Mode Three
+	bcf     STATUS,Z
+	movlw   B'00000010' ; move 0x02 (mode 2) to w register
+	xorwf   State,0     ; compare with w to see if it is mode 2
+	btfsc   STATUS,Z    ; if it is mode 2 (Z will be 1)
+	goto    ModeTwo     ; goto Mode Two
 
-bcf     STATUS,Z
-movlw   B'11111100' ; move 0xF4 (mode 4) to w register
-xorwf   State,0     ; compare with w to see if it is mode 4
-btfsc   STATUS,Z    ; if it is mode 4 (Z will be 1)
-goto    ModeFour    ; goto Mode Four
+	bcf     STATUS,Z
+	movlw   B'00000011' ; move 0x03 (mode 3) to w register
+	xorwf   State,0     ; compare with w to see if it is mode 3
+	btfsc   STATUS,Z    ; if it is mode 3 (Z will be 1)
+	goto    ModeThree   ; goto Mode Three
+
+	bcf     STATUS,Z
+	movlw   B'00000100' ; move 0xF4 (mode 4) to w register
+	xorwf   State,0     ; compare with w to see if it is mode 4
+	btfsc   STATUS,Z    ; if it is mode 4 (Z will be 1)
+	goto    ModeFour    ; goto Mode Four
 ;------------------------------------------------
 
 ;#######################################################
 
 ; Fault Processing
-; If it is mode 1,2,3,4, Welcome to FaultProcessing !
+; If it is not mode 1,2,3,4, Welcome to FaultProcessing !
+; If you make mistakes in mode 1,2,3,4, Welcome to FaultProcessing too !
 
 FaultInfo
 
 ;movwf   PORTE,0     ; read PORTE value to w register
-comf    PORTE,0     ; compliment PortE to w register
-movwf   PORTB       ; send the right LED indicator to PORTB
-clrf    PORTD       ; clear the armature
+;comf    PORTE,0     ; complement PortE to w register
+;movwf   PORTB       ; send the right LED indicator to PORTB
+	clrf    PORTD       ; clear the armature
 
 Loop
 
-bsf     PORTB,3     ; PortB pin3 Error LED indicator on
-call    FaultDelay  ; make Port B flash on  
-bcf     PORTB,3     ; PortB pin3 Error LED indicator off
-call    FaultDelay  ; make port B flash off
-goto    Loop        ; Keep the loop
+	bsf     PORTB,3     ; PortB pin3 Error LED indicator on
+	call    FaultDelay  ; make Port B flash on  
+	bcf     PORTB,3     ; PortB pin3 Error LED indicator off
+	call    FaultDelay  ; make port B flash off
+	goto    Loop        ; Keep the loop
 
 FaultDelay
 ;   Set delay duration
 ;   here we want the delay to last for one second
-movlw   06h         ; get most significant hex value +1
-movwf  Timer2      
-movlw   16h
-movwf   Timer1
-movlw   15h
-movwf   Timer0
+	movlw   06h         ; get most significant hex value +1
+	movwf   Timer2      
+	movlw   16h
+	movwf   Timer1
+	movlw   15h
+	movwf   Timer0
 
 FaultDelayLoop
 
-decfsz  Timer0, F
-goto    FaultDelayLoop
-decfsz  Timer1, F
-goto    FaultDelayLoop
-decfsz  Timer2, F
-goto    FaultDelayLoop
-
-return
+	decfsz  Timer0, F
+	goto    FaultDelayLoop
+	decfsz  Timer1, F
+	goto    FaultDelayLoop
+	decfsz  Timer2, F
+	goto    FaultDelayLoop
+	return
 ;---------------------------------------------
 
 ; MODE 1 REALLY WORKS !!! YEAH HAHAHAHAHAHA!! 
@@ -218,57 +220,57 @@ ModeOne
 
 ;below two expressions might be useless, just follow the Counter.asm
 
-btfsc   PORTC,0     ; see if green button pressed;   no           
-goto    GreenPress
-btfsc   PORTC,1     ; see if red button pressed
-goto    RedPress    ; if it is , go to redpress
-goto    ModeOne     ; keep checking
+	btfsc   PORTC,0     ; see if green button pressed;   no           
+	goto    GreenPress
+	btfsc   PORTC,1     ; see if red button pressed
+	goto    RedPress    ; if it is , go to redpress
+	goto    ModeOne     ; keep checking
 
 
 RedPress
 
-btfss   PORTC,1     ; see if red button still pressed
-goto    ModeOne     ; noise - keep checking
+	btfss   PORTC,1     ; see if red button still pressed
+	goto    ModeOne     ; noise - keep checking
 
 
 RedRelease
 
-btfsc   PORTC,1     ; see if red button released
-goto    RedRelease  ; no , keep checking
-call    SwitchDelay ; let switch debounce
-btfss   PORTD,1     ; see if solenoid is engaged or disengaged , by Pin 1 in PORTD
-goto    SoleToEng   ; if it is disengaged, make it engage
-goto    SoleToDis   ; if it is engaged, make it disengage
+	btfsc   PORTC,1     ; see if red button released
+	goto    RedRelease  ; no , keep checking
+	call    SwitchDelay ; let switch debounce
+	btfss   PORTD,1     ; see if solenoid is engaged or disengaged , by Pin 1 in PORTD
+	goto    SoleToEng   ; if it is disengaged, make it engage
+	goto    SoleToDis   ; if it is engaged, make it disengage
 
-goto    ModeOne    ; when everything is done, return to ModeOne, keep looping
+	goto    ModeOne    ; when everything is done, return to ModeOne, keep looping
 
 ;###########################################################
 
 SoleToEng
 ; make solenoid engage
-movlw	B'0001'
-movwf	PORTB
-bsf     PORTD,0     ; make it engage
-btfsc   PORTD,1     ; check if it is engaged , this pin is connected to LM311 as an input
-goto    TrnReduced              ; if it is, return 
-goto SoleToEng      ; if not, keep looping
+	movlw	B'0001'
+	movwf	PORTB
+	bsf     PORTD,0     ; make it engage
+	btfsc   PORTD,1     ; check if it is engaged , this pin is connected to LM311 as an input
+	goto    TrnReduced              ; if it is, return 
+	goto SoleToEng      ; if not, keep looping
 
 TrnReduced
 
-bsf     PORTD,2     ; turn on the reduced transistor
-bcf     PORTD,0     ; turn off the main transistor
-bsf		PORTB,1
-goto    ModeOne
+	bsf     PORTD,2     ; turn on the reduced transistor
+	bcf     PORTD,0     ; turn off the main transistor
+	bsf		PORTB,1
+	goto    ModeOne
 
 SoleToDis
 ; make solenoid disengage
-movlw	B'1000'
-movwf	PORTB
-bcf     PORTD,0     ; make it disengage
-bcf     PORTD,2     ; turn off the reduced transistor
-btfss   PORTD,1     ; check if it is disengaged
-goto    ModeOne              ; if it is , return
-goto    SoleToDis   ; if not , keep looping
+	movlw	B'1000'
+	movwf	PORTB
+	bcf     PORTD,0     ; make it disengage
+	bcf     PORTD,2     ; turn off the reduced transistor
+	btfss   PORTD,1     ; check if it is disengaged
+	goto    ModeOne              ; if it is , return
+	goto    SoleToDis   ; if not , keep looping
 ;--------------------------------------------------------
 
 ;##############################################################
