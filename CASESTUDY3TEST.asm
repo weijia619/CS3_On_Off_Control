@@ -497,7 +497,7 @@ oneforthvalue4
 	btfsc STATUS,Z
 	call SolenoidDis
 	btfsc STATUS,Z
-	goto waitPress4
+	goto waitloop4
 	
 ;if ADvalue doesn't equal to 0, then delay for one forth second	
 	call Timedelay	;delay one forth second
