@@ -37,7 +37,7 @@ ADValue equ 24h ; value read from AD
 Timer2  equ 25h
 Timer1  equ 26h
 Timer0  equ 27h
-
+OneSec	equ	28h
 ;Initial Part
 
     org 00h
@@ -223,7 +223,11 @@ SoleToEng
 	bsf     PORTD,0     ; make it engage
 	btfsc   PORTD,1     ; check if it is engaged , this pin is connected to LM311 as an input
 	goto    TrnReduced  ; if it is, turn on and off the corresponding transistors 
-	goto 	SoleToEng   ; if not, keep looping
+	btfss	PORTB,3		; 
+	goto	SoleToEng	; if it is not mode4, wait for it to engage	
+	call	TenSecDelay ; call a ten seconds delay
+	btfsc	PORTD,1		; if it is still not indicating engagement
+	goto	FaultInfo
 
 TrnReduced
 
@@ -310,9 +314,11 @@ QuarterDelay
 	movwf   Timer0
 
 QuarterDelayLoop
-
+	btfsc	PORTB,2		; if it is mode 4
+	goto	NoInterruption; ignore the RedAgain
 	btfsc   PORTC,1     ; check if press the red button again before time finishes
 	goto    WTFRedAgain
+NoInterruption
 	decfsz  Timer0,F
 	goto    QuarterDelayLoop
 	decfsz  Timer1,F
@@ -398,9 +404,49 @@ CtrlAct
 
 ModeFour
 
-bsf     PORTD,7     ; null
+	btfsc   PORTC,0     ; see if green button pressed;   no           
+	goto    GreenPress
 
-goto	ModeFour
+	clrf	PORTD		; initialize PORTD
+
+	movlw   B'01000001' ; select 8 * oscillator , analog input 0 , turn on
+	movwf   ADCON0      ; move to special function A/D register
+
+	call    ADDelay     ; delay for Tad prior to A/D start
+	bsf     ADCON0,GO   ; start A/D conversion
+	call    ADwaitLoop  ; since we might use this in the next modes, here define it as a subroutine
+;	movf    ADRESH,W    ; get A/D value
+;	movwf   ADValue     ; send it to ADValue
+
+	movf    ADRESH,W    ; get A/D value, send it to w register
+	iorlw   B'00000000' ; inclusive OR with W, to see if AD value is 0
+; check if xorlw also works 1!!!!
+	btfsc   STATUS,Z    ; if it is zero ( Z will be 1)
+	goto    FaultInfo   ; a fault is indicated
+
+	btfsc   PORTC,1     ; see if red button pressed
+	goto    RedPress4    ; if it is , go to redpress
+	goto    ModeFour     ; keep checking
+
+
+RedPress4
+
+	btfss   PORTC,1     ; see if red button still pressed
+	goto    ModeFour     ; noise - keep checking
+
+
+RedRelease4
+
+	btfsc   PORTC,1     ; see if red button released
+	goto    RedRelease4  ; no , keep checking
+	call    SwitchDelay ; let switch debounce
+	btfss   PORTD,1     ; see if solenoid is engaged or disengaged , by Pin 1 in PORTD
+	call    SoleToEng   ; if it is disengaged, make it engage
+	call    EngTimer
+	call    SoleToDis   ; if it is engaged, make it disengage
+
+	goto    ModeFour    ; when everything is done, return to ModeOne, keep looping
+
 
 ;####################################################
 
@@ -408,33 +454,53 @@ goto	ModeFour
 
 SwitchDelay
 
-movlw   D'20'
-movwf   Delay
-goto    GeneralDelay
+	movlw   D'20'
+	movwf   Delay
+	goto    GeneralDelay
 
 ADDelay
 
-movlw   03h
-movwf   Delay
-goto    GeneralDelay
+	movlw   03h
+	movwf   Delay
+	goto    GeneralDelay
 
 GeneralDelay
 
-decfsz  Delay, F
-goto    GeneralDelay
-return
+	decfsz  Delay, F
+	goto    GeneralDelay
+	return
+;-----------------------------------------------
 
+TenSecDelay
+	movlw	0Ah
+	movwf	OneSec
+OneSecDelay
+	movlw   02h         ; get most significant hex value +1
+	movwf   Timer2      ; 
+	movlw   16h         ;
+	movwf   Timer1
+	movlw   15h
+	movwf   Timer0
 
+LooopDelay
 
+	decfsz  Timer0,F
+	goto    LooopDelay
+	decfsz  Timer1,F
+	goto    LooopDelay
+	decfsz  Timer2,F
+	goto    LooopDelay
 
-
-
+	decfsz  OneSec,F   ; decrement ADValue, end when Advalue = 0
+	goto    OneSecDelay
+	
+	return
 
 
 
 ;##########################################
 isrService
 
-goto	isrService
+	goto	isrService
 
-END
+	END
