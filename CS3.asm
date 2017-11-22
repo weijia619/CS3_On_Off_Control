@@ -342,46 +342,57 @@ WTFRedRelease
 
 ModeThree
 
-btfsc   PORTC,0     ;see if green button pressed
-goto    GreenPress  ; if pressed , go to GreenPress
+	btfsc   PORTC,0     ;see if green button pressed
+	goto    GreenPress  ; if pressed , go to GreenPress
 
-movlw   B'01000001' ; select 8 * oscillator , analog input 0 , turn on
-movwf   ADCON0      ; move to special function A/D register
+	clrf	PORTD     ; init of PORTD, pin 4
 
-call    ADDelay     ; delay for Tad prior to A/D start
-bsf     ADCON0,GO   ; start A/D conversion
-call    ADwaitLoop  ; since we might use this in the next modes, here define it as a subroutine
-btfsc   ADCON0,GO   ; make sure A/D finished
-goto    ADwaitLoop  ; else keep looping
+	movlw   B'01000001' ; select 8 * oscillator , analog input 0 , turn on
+	movwf   ADCON0      ; move to special function A/D register
 
-bcf     PORTD,4     ; init of PORTD, pin 4
+	call    ADDelay     ; delay for Tad prior to A/D start
+	bsf     ADCON0,GO   ; start A/D conversion
+	call    ADwaitLoop  ; since we might use this in the next modes, here define it as a subroutine
 
-btfsc   PORTC,1     ; see if red button pressed
-goto    RedPress3   ; go to red press mode 3
-goto    ModeThree
+
+	btfsc   PORTC,1     ; see if red button pressed
+	goto    RedPress3   ; go to red press mode 3
+	goto    ModeThree
 
 
 RedPress3
 
-btfsc   PORTC,1     ; see if red button released
-goto    ModeThree   ; noise -- keep checking
+	btfsc   PORTC,1     ; see if red button released
+	goto    RedPress3   ; noise -- keep checking
 
 
 RedRelease3
-
-btfsc   PORTC,1     ; see if red button released
-goto    RedRelease3 ; no ,keep checking 
-call    SwitchDelay ; let switch debounce
-;btg     PORTD,4     ; invert PORTD,pin 4
-btfsc   PORTD,4     ; if PORTD , pin 4 is 1, make control active
-goto    CtrlAct     ; goto Control Active part
-;goto    CtrlDeact   ; else goto control deactive part
-
+	btfsc	PORTC,1		; wait until I release the red button
+	goto	RedRelease3 ; wait until I release the red button
+	btfsc   PORTD,4     ; if PORTD , pin 4 is 0, turn it on,make control active
+	goto    ModeThree   ; else goto control deactive part
+	goto	CtrlAct     ; goto Control Active part
 
 CtrlAct
-
-
-
+	btfsc   PORTC,1     ; see if red button released
+	goto    RedRelease3   ; noise -- keep checking
+	bsf		PORTD,4		; light the PortD, pin 4, sign of active
+	movf    ADRESH,W    ; get A/D value
+	movwf   ADValue     ; send it to ADValue
+	iorlw   B'00000000' ; inclusive OR with W, to see if AD value is 0
+; check if xorlw also works 1!!!!
+	btfsc   STATUS,Z    ; if it is zero ( Z will be 1)
+	goto    FaultInfo   ; a fault is indicated
+	movlw	B'01110000' ; set W as 70h
+	subwf	ADValue,1	; substract W from ADvalue, save result in W
+	btfsc	STATUS,C	; check the borrow register in Status
+	call	SoleToEng	; if AdValue > 70h, engage
+	btfss	STATUS,C	; 
+	call	SoleToDis	; if AdValue < 70h, disengage
+	call    ADDelay     ; delay for Tad prior to A/D start
+	bsf     ADCON0,GO   ; start A/D conversion
+	call    ADwaitLoop  ; since we might use this in the next modes, here define it as a subroutine
+	goto	CtrlAct
 
 ;####################################################
 
